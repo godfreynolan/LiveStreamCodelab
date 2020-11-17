@@ -1,0 +1,25 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2020-11-17T16:25:13-05:00",
+  "id": "write-livestream-drone-app",
+  "duration": 102,
+  "title": "Write LiveStream app for DJI drone",
+  "authors": "Godfrey Nolan",
+  "summary": "Write a LiveStream app for DJI drone",
+  "source": "write-livestream-drone-app.md",
+  "theme": "",
+  "status": [
+    "published"
+  ],
+  "category": [
+    "dji"
+  ],
+  "tags": [
+    "medium"
+  ],
+  "feedback": "https://riis.com",
+  "url": "write-livestream-drone-app"
+}

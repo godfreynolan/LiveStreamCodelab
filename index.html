@@ -1,0 +1,1323 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Write LiveStream app for DJI drone</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid=""
+                  id="write-livestream-drone-app"
+                  title="Write LiveStream app for DJI drone"
+                  environment="web"
+                  feedback-link="https://riis.com">
+    
+      <google-codelab-step label="Overview" duration="1">
+        <h2 is-upgraded>What You`ll Learn</h2>
+<p>The DJI Livestream app uses the <a href="https://developer.dji.com/mobile-sdk/" target="_blank">DJI Mobile SDK</a> and the <a href="https://github.com/pedroSG94/rtmp-rtsp-stream-client-java" target="_blank">rtmp-rtsp-stream-client-java library</a>. In this codelab you`ll learn how to connect and stream the drone&#39;s camera view over RTMP. This is the Android version of the codelab.</p>
+<p>To begin create a new app in Android Studio using the Empty Activity template.</p>
+<p class="image-container"><img alt="twitch-livestream" src="img\\7c0ba73029f956df.jpg"></p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Android Manifest changes" duration="3">
+        <p>In AndroidManifest.xml we need to make the following changes</p>
+<ul>
+<li>Add the necessary permissions</li>
+<li>Grant access to the USB port</li>
+<li>Specify the Application class</li>
+<li>Create and add the DJI SDK API key</li>
+<li>Specify the Streaming Service Display class</li>
+</ul>
+<p>Add the following permissions to the AndroidManifest</p>
+<p>These permissions are used to connect to the drone, save videos/pictures from the drone, access the user`s location, and allow the user to stream their phone display.</p>
+<pre><code language="language-javascript" class="language-javascript">    &lt;!-- Permissions and features --&gt;
+    &lt;uses-permission android:name=&#34;android.permission.BLUETOOTH&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.BLUETOOTH_ADMIN&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.VIBRATE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.INTERNET&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.ACCESS_WIFI_STATE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.WAKE_LOCK&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.ACCESS_COARSE_LOCATION&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.ACCESS_NETWORK_STATE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.ACCESS_FINE_LOCATION&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.CHANGE_WIFI_STATE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.MOUNT_UNMOUNT_FILESYSTEMS&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.WRITE_EXTERNAL_STORAGE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.READ_EXTERNAL_STORAGE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.SYSTEM_ALERT_WINDOW&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.READ_PHONE_STATE&#34; /&gt;
+    &lt;uses-permission android:name=&#34;android.permission.INTERNET&#34;/&gt;
+    &lt;uses-permission android:name=&#34;android.permission.FOREGROUND_SERVICE&#34;/&gt;
+    &lt;uses-permission android:name=&#34;android.permission.RECORD_AUDIO&#34;/&gt;
+</code></pre>
+<p>The app also uses the phone&#39;s USB to connect to the drone`s remote control. The following permissions grant access to the USB port:</p>
+<pre><code language="language-javascript" class="language-javascript">    &lt;uses-feature android:name=&#34;android.hardware.usb.host&#34; android:required=&#34;false&#34; /&gt;
+    &lt;uses-feature android:name=&#34;android.hardware.usb.accessory&#34; android:required=&#34;true&#34; /&gt;
+</code></pre>
+<p>Specify the name of the application class which we will create later for the DJI SDK.</p>
+<pre><code language="language-javascript" class="language-javascript">    &lt;application
+        android:name=&#34;com.riis.livestream.LivestreamApplication&#34;
+</code></pre>
+<p>The DJI SDK needs a DJI API key. Go to <a href="https://developer.dji.com" target="_blank">DJI Developer Website</a> and apply for an API Key for your new application. Once you have your key add it to the meta data so you app can communicate with the SDK.</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;meta-data
+ android:name=&#34;com.dji.sdk.API_KEY&#34;
+ android:value=&#34;xxxxxxxxxxxxxxxxxxxxxxxx&#34; /&gt;
+</code></pre>
+<p>To specify our service for the streaming of the display as follows</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;service android:name=&#34;.DisplayService&#34;
+ android:foregroundServiceType=&#34;mediaProjection&#34;/&gt;
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Update Gradle files" duration="3">
+        <p>Edit the build.gradle (Project) file and add the jetpack.io repository so we can download the RTMP library</p>
+<h2 is-upgraded>Add the jetpack.io repository</h2>
+<pre><code language="language-java" class="language-java">allprojects {
+    repositories {
+        google()
+        jcenter()
+        maven { url &#39;https://jitpack.io&#39; }
+    }
+}
+</code></pre>
+<p>Edit the build.gradle (Module) file and make the following changes</p>
+<ul>
+<li>Set the minSdkVersion to 24</li>
+<li>Add the NDK abiFilters</li>
+<li>Set the Java and JVM target to 1.8</li>
+<li>Stop the DJI Libraries from being stripped</li>
+<li>Finally all the DJI SDK, ViewModel and RTMP libraries</li>
+</ul>
+<h2 is-upgraded>Set the minSdkVersion to 24</h2>
+<pre><code language="language-java" class="language-java">    defaultConfig {
+    	...
+	minSdkVersion 24
+	...
+    }
+</code></pre>
+<h2 is-upgraded>Add the NDK abiFilters again in default.config</h2>
+<pre><code language="language-java" class="language-java">    defaultConfig {
+    	...
+	minSdkVersion 24
+	...
+	...
+        ndk {
+            abiFilters &#39;armeabi-v7a&#39;, &#39;x86&#39;, &#39;arm64-v8a&#39;
+        }
+	
+    }
+</code></pre>
+<h2 is-upgraded>Set the Java and JVM target to 1.8</h2>
+<pre><code language="language-java" class="language-java">    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = &#34;1.8&#34;
+    }
+</code></pre>
+<h2 is-upgraded>Stop the DJI Libraries from being stripped</h2>
+<pre><code language="language-java" class="language-java">    packagingOptions{
+        doNotStrip &#34;*/*/libdjivideo.so&#34;
+        doNotStrip &#34;*/*/libSDKRelativeJNI.so&#34;
+        doNotStrip &#34;*/*/libFlyForbid.so&#34;
+        doNotStrip &#34;*/*/libduml_vision_bokeh.so&#34;
+        doNotStrip &#34;*/*/libyuv2.so&#34;
+        doNotStrip &#34;*/*/libGroudStation.so&#34;
+        doNotStrip &#34;*/*/libFRCorkscrew.so&#34;
+        doNotStrip &#34;*/*/libUpgradeVerify.so&#34;
+        doNotStrip &#34;*/*/libFR.so&#34;
+        doNotStrip &#34;*/*/libDJIFlySafeCore.so&#34;
+        doNotStrip &#34;*/*/libdjifs_jni.so&#34;
+        doNotStrip &#34;*/*/libsfjni.so&#34;
+        exclude &#39;META-INF/rxjava.properties&#39;
+    }
+</code></pre>
+<h2 is-upgraded>Add the ViewModel, DJI Mobile SDK and RTMP libraries</h2>
+<pre><code language="language-java" class="language-java">dependencies {
+    ...
+    
+    // Viewmodel
+    implementation &#39;androidx.fragment:fragment-ktx:1.2.4&#39;
+    implementation &#39;androidx.lifecycle:lifecycle-extensions:2.2.0&#39;
+    implementation &#39;androidx.lifecycle:lifecycle-livedata-ktx:2.2.0&#39;
+    implementation &#39;androidx.lifecycle:lifecycle-viewmodel-ktx:2.2.0&#39;
+
+    // DJI
+    compile(&#39;com.dji:dji-sdk:4.12&#39;)
+    provided(&#39;com.dji:dji-sdk-provided:4.12&#39;)
+
+    // Livestream
+    implementation &#39;com.github.pedroSG94.rtmp-rtsp-stream-client-java:rtplibrary:1.8.4&#39;
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="DJI SDK Initialization" duration="3">
+        <p>The DJI SDK needs the following Application class to be set up before the application is fully loaded. This prevents any unexpected crashes while the DJI SDK is being initialized at runtime.</p>
+<h2 is-upgraded>Create a new Kotlin Class called LivestreamApplication</h2>
+<p>The LivestreamApplication class needs to extend ‘Application&#39;</p>
+<pre><code language="language-java" class="language-java">class LivestreamApplication: Application() {
+
+}
+</code></pre>
+<h2 is-upgraded>Override the ‘attachBaseContext&#39; Function and call the helper function to initialize the SDK</h2>
+<pre><code language="language-java" class="language-java">class LivestreamApplication: Application() {
+	override fun attachBaseContext(base: Context?) {
+	    super.attachBaseContext(base)
+	     // Helper needed for DJI App registration
+	    Helper.install(this)
+	}
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="DJI Resource Manager" duration="10">
+        <p>Create a new Kotlin class called ‘DJIResourceManager&#39; which will be used to handle the drone&#39;s connection information. This class utilizes the ‘ExperimentalCoroutinesApi&#39; and the data type ‘Flow&#39;.</p>
+<h2 is-upgraded>Add Flow and ExperimentalCoroutinesApi Tags</h2>
+<pre><code language="language-java" class="language-java">@ExperimentalCoroutinesApi
+@FlowPreview
+class DJIResourceManager {
+
+}
+</code></pre>
+<h2 is-upgraded>Add the Instance Variables to the Objects</h2>
+<p>Since only one instance of this class is needed, it will be created as a singleton. The private object will create the instance of the class, and the companion object will call it.</p>
+<pre><code language="language-java" class="language-java">@ExperimentalCoroutinesApi
+@FlowPreview
+class DJIResourceManager {
+
+	private object HOLDER {
+	    val INSTANCE = DJIResourceManager()
+	}
+
+	companion object {
+	    val instance: DJIResourceManager by lazy { HOLDER.INSTANCE }
+	}
+}
+</code></pre>
+<h2 is-upgraded>Add the FlightController, Aircraft, Connection Status, and Registration Variables</h2>
+<p>The following variables will be added to handle the</p>
+<ul>
+<li>Drone&#39;s information</li>
+<li>The remote control&#39;s information</li>
+<li>Connection status of the drone</li>
+<li>Application Registration with DJI</li>
+</ul>
+<pre><code language="language-java" class="language-java">@ExperimentalCoroutinesApi
+@FlowPreview
+class DJIResourceManager {
+
+	....
+	var flightController: FlightController? = null
+	var aircraft: Aircraft? = null
+
+	private var _connectionStatus = ConflatedBroadcastChannel(false)
+	val connectionStatus: Flow&lt;Boolean&gt; = _connectionStatus.asFlow()
+
+	private var isRegistrationInProgress = false
+}
+</code></pre>
+<h2 is-upgraded>Create the Function to Register the Application</h2>
+<p>A suspend function is used to register the application with DJI to prevent registration from blocking the main thread. Inside the suspend function, we need to check if the application registration is already in progress. If it is, we can exit the function.</p>
+<pre><code language="language-java" class="language-java">suspend fun registerApp(context: Context): Boolean {
+    if(isRegistrationInProgress){
+        return false
+    }
+
+    isRegistrationInProgress = true
+}
+</code></pre>
+<h2 is-upgraded>Start Registration</h2>
+<p>Now the registration function from the DJISDKManager Class can be called. This function will use a callback to listen to a response from DJI about whether the registration was successful and start the application connection with the drone.</p>
+<p>The following functions will be overriden inside the SDKManagerCallback:</p>
+<ul>
+<li>onProductConnect</li>
+<li>onProductDisconnect</li>
+<li>onComponentChange</li>
+<li>onRegister</li>
+<li>onDatabaseDownloadProgress</li>
+<li>onInitProgess</li>
+</ul>
+<pre><code language="language-java" class="language-java">suspend fun registerApp(context: Context): Boolean {
+
+	...
+	DJISDKManager.getInstance().registerApp(context, object :    
+		DJISDKManager.SDKManagerCallback {
+
+	    override fun onProductDisconnect() {
+        
+	    }
+
+	    override fun onProductConnect(product: BaseProduct?) {
+        
+	    }
+
+	    override fun onComponentChange(componentKey: BaseProduct.ComponentKey?, 
+	    	oldComponent: BaseComponent?, newComponent: BaseComponent?) {
+	
+	    }
+
+	    override fun onRegister(p0: DJIError?) {
+        
+	    }
+
+	    override fun onDatabaseDownloadProgress(p0: Long, p1: Long) {
+        
+	    }
+
+	    override fun onInitProcess(p0: DJISDKInitEvent?, p1: Int) {
+        
+	    }
+
+	})
+}
+</code></pre>
+<h2 is-upgraded>Reset the Variables in onProductDisconnect</h2>
+<p>The onProductDisconnect will be used to reset the variables in this class if the drone become disconnected from the application.</p>
+<pre><code language="language-java" class="language-java">    override fun onProductDisconnect() {
+        flightController = null
+        _connectionStatus.offer(false)
+
+    }
+</code></pre>
+<h2 is-upgraded>Assign the local variables from onProductConnect</h2>
+<p>The onProductConnect function will store the drone, remote control, and connection status in the variables that were created earlier. Assigning these variables can fail, so it is important to place the variable assignment in a try-catch block.</p>
+<pre><code language="language-java" class="language-java">    override fun onProductConnect(product: BaseProduct?) {
+        product?.let {
+            try {
+                aircraft = (it as Aircraft)
+                flightController = it.flightController
+                _connectionStatus.offer(true)
+            } catch (ex: Exception){
+                flightController = null
+            }
+        }
+    }
+</code></pre>
+<h2 is-upgraded>Start Drone Connection from onRegister</h2>
+<p>The onRegister function will check if the application registration from DJI was successful. If it is, we can start the connection from the application to the drone.</p>
+<pre><code language="language-java" class="language-java">    override fun onRegister(p0: DJIError?) {
+        if(p0 == DJISDKError.REGISTRATION_SUCCESS){
+            //Registration Successful
+            DJISDKManager.getInstance().startConnectionToProduct()
+            continuation.resume(true)
+        } else {
+            // Registration Failed
+            continuation.resume(false)
+        }
+        isRegistrationInProgress = false
+    }
+</code></pre>
+<p>The onComponentChange, onDatabaseDownloadProgress, and onInitProcess will not used in this application.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Creating the Display Service Class" duration="25">
+        <p>Display Service is responsible for handling all of the streaming capability from the RTMP library so that we can start streaming from any other class in the project.</p>
+<h2 is-upgraded>Create the Display Service Class</h2>
+<p>This class needs to extend ‘Service&#39; since recording/streaming the screen is considered a service. Create a new Kotlin file called ‘DisplayService&#39;</p>
+<pre><code language="language-java" class="language-java">class DisplayService: Service() {
+
+}
+</code></pre>
+<h2 is-upgraded>Add the Class Variables</h2>
+<p>The following variables will be added to the class:</p>
+<ul>
+<li>endpoint - The stream key obtained from your Twitch account</li>
+<li>disableAudio - Boolean to determine if the audio from the phone should be disabled while streaming</li>
+<li>channelId - String ID used for the NotificationManager</li>
+<li>notifyId - Integer ID used for the Notifications</li>
+<li>streamBinder - Binds the stream to the phone (we will create this class later)</li>
+<li>notificationManager - Handles the notifications sent to the user</li>
+</ul>
+<pre><code language="language-java" class="language-java">class DisplayService: Service() {
+    private var endpoint: String? = null
+    private var disableAudio: Boolean? = null
+
+    private val channelId = &#34;rtpDisplayStreamChannel&#34;
+    private val notifyId = 123456
+    private val streamBinder = StreamBinder(this)
+    private lateinit var notificationManager: NotificationManager
+
+}
+</code></pre>
+<h2 is-upgraded>Override the onCreate Function</h2>
+<p>Since our service is a ‘foregroundService&#39;, we need to notify the user about what our service entails. Then they can choose to accept or decline the service.</p>
+<pre><code language="language-java" class="language-java">override fun onCreate() {
+    super.onCreate()
+
+}
+</code></pre>
+<h2 is-upgraded>Creating the Notification Manager</h2>
+<p>We need to initialize the notification manager in order to send notifications to the user. Then we create the NotificationChannel where all of our notifications will be sent.</p>
+<pre><code language="language-java" class="language-java">override fun onCreate() {
+    ...
+    notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val channel =
+            NotificationChannel(channelId, channelId, NotificationManager.IMPORTANCE_HIGH)
+    notificationManager.createNotificationChannel(channel)
+    // If this function is not here, the recording/streaming only lasts
+    // as long as the notification shows to the user (about 4 seconds)
+    keepAliveTrick()
+}
+</code></pre>
+<h2 is-upgraded>Keeping the Service Alive</h2>
+<p>Currently, in Android, the notification will only last around 4 seconds. Once the notification disappears, our service will stop. To fix this, we create the function ‘keepAliveTrick&#39;. This function will keep our service running until the user decides to stop it. Check the current version of Android that the user is using. The notification will be kept alive differently if the user&#39;s version is above Oreo.</p>
+<pre><code language="language-java" class="language-java">private fun keepAliveTrick() {
+    if (Build.VERSION.SDK_INT &gt; Build.VERSION_CODES.O) {
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setOngoing(true)
+            .setContentTitle(&#34;&#34;)
+            .setContentText(&#34;&#34;).build()
+        startForeground(1, notification)
+    } else {
+        startForeground(1, Notification())
+    }
+}
+</code></pre>
+<h2 is-upgraded>Overriding the onStartCommand</h2>
+<p>When our service is started, we will get the endpoint. Then the streaming can be prepared and started.</p>
+<pre><code language="language-java" class="language-java">override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    // When the intent is started, the endpoint is pulled from the intent
+    // and the stream is prepared and started
+    endpoint = intent?.extras?.getString(&#34;endpoint&#34;)
+    disableAudio = intent?.extras?.getBoolean(&#34;audio&#34;)
+    if (endpoint != null) {
+        prepareStreamRtp()
+        startStreamRtp(endpoint!!)
+    }
+    return START_STICKY
+}
+</code></pre>
+<h2 is-upgraded>Overriding the onBind</h2>
+<p>To bind our service to the phone, we override the onBind function. We will return our streamBinder variable that we created earlier.</p>
+<pre><code language="language-java" class="language-java">override fun onBind(intent: Intent?): IBinder? {
+    return streamBinder
+}
+</code></pre>
+<h2 is-upgraded>Streaming Companion Object</h2>
+<p>Create a companion object to hold the general information about the streaming since only one instance of this information is needed.</p>
+<p>We will add the following variables to the companion object:</p>
+<ul>
+<li>TAG</li>
+<li>channelId</li>
+<li>notifyId</li>
+<li>notificationManager</li>
+<li>displayBase</li>
+<li>contextApp</li>
+<li>resultCode</li>
+<li>data</li>
+</ul>
+<pre><code language="language-java" class="language-java">companion object {
+    private val TAG = &#34;DisplayService&#34;
+    private val channelId = &#34;rtpDisplayStreamChannel&#34;
+    private val notifyId = 123456
+    private var notificationManager: NotificationManager? = null
+    private var displayBase: DisplayBase? = null
+    private var contextApp: Context? = null
+    private var resultCode: Int? = null
+    private var data: Intent? = null
+}
+</code></pre>
+<h2 is-upgraded>Initalizing the RTMPDisplay</h2>
+<p>We will also add the following functions to the companion object to initialize the variables, check the current status of the stream/recording, and to stop the stream:</p>
+<ul>
+<li>init() - Initializes the RtmpDisplay for streaming</li>
+<li>setData(resultCode Int, data: Intent) - Initializes the resultCode and data</li>
+<li>sendIntent() - starts the Intent</li>
+<li>isStreaming() - Checks if the service is currently recording</li>
+<li>isRecording() - Checks if the service is currently streaming</li>
+<li>stopStream() - Stops the stream service</li>
+</ul>
+<p>We will create the ‘connectCheckerRtp&#39; variable later</p>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    fun init(context: Context) {
+        contextApp = context
+        if (displayBase == null) displayBase = RtmpDisplay(context, true, connectCheckerRtp)
+    }
+}
+</code></pre>
+<h2 is-upgraded>Initializing the variables</h2>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    fun setData(resultCode: Int, data: Intent) {
+        this.resultCode = resultCode
+        this.data = data
+    }
+}
+</code></pre>
+<h2 is-upgraded>Sending the Intent</h2>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    fun sendIntent(): Intent? {
+        if (displayBase != null) {
+            return displayBase!!.sendIntent()
+        } else {
+            return null
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Checking if the Service is Currently Streaming</h2>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    fun isStreaming(): Boolean {
+        return if (displayBase != null) displayBase!!.isStreaming else false
+    }
+}
+</code></pre>
+<h2 is-upgraded>Checking if the Service is Currently Recording</h2>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    fun isRecording(): Boolean {
+        return if (displayBase != null) displayBase!!.isRecording else false
+    }
+}
+</code></pre>
+<h2 is-upgraded>Stopping the Stream Service</h2>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    fun stopStream() {
+        if (displayBase != null) {
+            if (displayBase!!.isStreaming) displayBase!!.stopStream()
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Creating the connectCheckerRtp variable</h2>
+<p>Create the connectCheckerRtp to see the status of the connection of the application to Twitch. Override the following functions in the connectCheckerRtp, however we will only use them to log the status:</p>
+<ul>
+<li>onAuthSuccessRtmp</li>
+<li>onNewBitrateRtmp</li>
+<li>onConnectionSuccessRtmp</li>
+<li>onConnectionFailedRtmp</li>
+<li>onAtuhErrorRtmp</li>
+<li>onDisconnectRtmp</li>
+</ul>
+<pre><code language="language-java" class="language-java">companion object {
+    ...
+
+    private val connectCheckerRtp = object : ConnectCheckerRtmp {
+        override fun onAuthSuccessRtmp() {
+            Log.i(&#34;streamService&#34;, &#34;auth::Success&#34;)
+        }
+
+        override fun onNewBitrateRtmp(bitrate: Long) {
+
+        }
+
+        override fun onConnectionSuccessRtmp() {
+            Log.i(&#34;streamService&#34;, &#34;connection:Success&#34;)
+        }
+
+        override fun onConnectionFailedRtmp(reason: String) {
+            Log.i(&#34;streamService&#34;, &#34;connection::Error&#34;)
+        }
+
+        override fun onAuthErrorRtmp() {
+            Log.i(&#34;streamService&#34;, &#34;auth::Error&#34;)
+        }
+
+        override fun onDisconnectRtmp() {
+            Log.i(&#34;streamService&#34;, &#34;streamStopped&#34;)
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Preparing the Stream</h2>
+<p>Create a function to get the required information before we can start streaming.</p>
+<pre><code language="language-java" class="language-java">class DisplayService: Service() {
+    ...
+
+    private fun prepareStreamRtp() {
+        stopStream()
+        if (endpoint!!.startsWith(&#34;rtmp&#34;)) {
+            displayBase = RtmpDisplay(baseContext, true, connectCheckerRtp)
+            displayBase?.setIntentResult(resultCode!!, data)
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Creating the startStreamRtp Function</h2>
+<p>Create the function to start the stream with Twitch.</p>
+<pre><code language="language-java" class="language-java">class DisplayService: Service() {
+    ...
+
+    private fun startStreamRtp(endpoint: String) {
+        
+    }
+}
+</code></pre>
+<h2 is-upgraded>Getting the Dimensions of the Phone</h2>
+<p>Get the dimensions of the phone screen to send to Twitch for the optimal viewing on Twitch.</p>
+<pre><code language="language-java" class="language-java">private fun startStreamRtp(endpoint: String){
+    val displayMetrics = DisplayMetrics()
+    display?.getRealMetrics(displayMetrics)
+    val width = displayMetrics.widthPixels
+    val height = displayMetrics.heightPixels
+}
+</code></pre>
+<h2 is-upgraded>Starting the Stream with Twitch</h2>
+<p>Prepare the audio and video for streaming, disable the audio if needed, and start the stream.</p>
+<pre><code language="language-java" class="language-java">private fun startStreamRtp(endpoint: String){
+    ...
+
+    if (!displayBase!!.isStreaming) {
+        if (displayBase!!.prepareAudio() &amp;&amp; displayBase!!.prepareVideo(
+                width,
+                height,
+                30,
+                1200 * 1024,
+                0,
+                displayMetrics.densityDpi
+            )) {
+            // if the value passed through the intent for disable audio is true
+            // then the audio is disabled
+            disableAudio?.let {
+                if(it){
+                    displayBase!!.disableAudio()
+                }
+            }
+            displayBase!!.startStream(endpoint)
+        }
+    } else {
+        Log.i(&#34;streamService&#34;, &#34;AlreadyStreaming&#34;)
+    }
+}
+</code></pre>
+<h2 is-upgraded>Overriding the onDestroy Method</h2>
+<p>Override the onDestroy method in case the stream is destroyed by the user.</p>
+<pre><code language="language-java" class="language-java">class DisplayService: Service() {
+    ...
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopStream()
+        stopForeground(true)
+    }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="StreamBinder Class" duration="2">
+        <p>Create a new Kotlin class called ‘StreamBinder&#39;. We will create only one method that returns the service currently bound to the phone.</p>
+<pre><code language="language-java" class="language-java">class StreamBinder(private val service: DisplayService): Binder() {
+    fun getService(): DisplayService {
+        return service
+    }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="ViewModel Class" duration="4">
+        <p>Create a new Kotlin class called ‘MainViewModel&#39;. This class will communicate with the DJIResouceManager class we created earlier. This class needs to extend ‘ViewModel&#39;. It also needs the ‘ExperimentalCoroutinesApi&#39; and ‘Flow&#39; tags.</p>
+<pre><code language="language-java" class="language-java">@ExperimentalCoroutinesApi
+@FlowPreview
+class MainViewModel: ViewModel() {
+
+}
+</code></pre>
+<h2 is-upgraded>Adding the Variables</h2>
+<p>Create the following variables to get the connection status of the drone and the drone object. NotifyStatusChanged is of type ‘LiveData&#39; so that the UI can be updated as soon as the connection status from the application to the drone changes.</p>
+<pre><code language="language-java" class="language-java">@ExperimentalCoroutinesApi
+@FlowPreview
+class MainViewModel: ViewModel() {
+    val notifyStatusChanged = DJIResourceManager.instance.connectionStatus.asLiveData()
+
+    var product: Aircraft? = null
+    get(){
+        field = DJIResourceManager.instance.aircraft
+        return field
+    }
+    private set
+
+}
+</code></pre>
+<p>Create the function to call the register function that we created earlier to register the application with DJI.</p>
+<h2 is-upgraded>Creating the Register Function</h2>
+<pre><code language="language-java" class="language-java">@ExperimentalCoroutinesApi
+@FlowPreview
+class MainViewModel: ViewModel() {
+    ...
+
+    fun registerDJI(activity: Activity){
+        viewModelScope.launch {
+            DJIResourceManager.instance.registerApp(activity)
+        }
+    }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Audio Interface" duration="3">
+        <p>Create a new Kotlin interface called ‘AudioCheckBoxListener&#39;. This interface will be used to communicate between the Activity and the Fragment we will create later. It will only contain one function to check if the audio should be disabled.</p>
+<pre><code language="language-java" class="language-java">interface AudioCheckboxListener {
+    fun isAudioDisabled(value: Boolean)
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Creating the Main Fragment" duration="20">
+        <p>This fragment will be used to check the connection of the drone, display the drone information to the user, disable the audio, and request/check for permissions.</p>
+<h2 is-upgraded>Creating the Main Fragment&#39;s Layout File</h2>
+<p>Create a new resouce layout file in the layout folder called ‘fragment_main.xml&#39;. All settings can be left alone.</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;androidx.constraintlayout.widget.ConstraintLayout xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;
+    xmlns:app=&#34;http://schemas.android.com/apk/res-auto&#34;&gt;
+
+
+&lt;/androidx.constrainLayout.widget.ConstrainLayout&gt;
+</code></pre>
+<h2 is-upgraded>Adding the Linear Layout</h2>
+<p>Add a linear layout to hold all of our UI elements.</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;androidx.constraintlayout.widget.ConstraintLayout xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;
+    xmlns:app=&#34;http://schemas.android.com/apk/res-auto&#34;&gt;
+
+    &lt;LinearLayout
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;
+    app:layout_constraintStart_toStartOf=&#34;parent&#34;
+    app:layout_constraintTop_toTopOf=&#34;parent&#34;
+    android:orientation=&#34;vertical&#34;
+    android:layout_margin=&#34;12dp&#34;&gt;
+
+    &lt;/LinearLayout&gt;
+
+&lt;/androidx.constrainLayout.widget.ConstrainLayout&gt;
+</code></pre>
+<h2 is-upgraded>Adding the TextViews and Checkbox</h2>
+<p>Inside the linear layout, add two text views and a checkbox. The TextViews will display the drone name and connection status. The checkbox will allow the user to disable the audio.</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;LinearLayout
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;
+    app:layout_constraintStart_toStartOf=&#34;parent&#34;
+    app:layout_constraintTop_toTopOf=&#34;parent&#34;
+    android:orientation=&#34;vertical&#34;
+    android:layout_margin=&#34;12dp&#34;&gt;
+
+    &lt;TextView
+        android:id=&#34;@+id/status&#34;
+        android:layout_width=&#34;match_parent&#34;
+        android:layout_height=&#34;wrap_content&#34;
+        android:textSize=&#34;24sp&#34;
+        android:textStyle=&#34;bold&#34;
+        android:textColor=&#34;#000000&#34;
+        android:text=&#34;Status&#34;
+        android:paddingTop=&#34;2dp&#34;
+        android:paddingBottom=&#34;2dp&#34;/&gt;
+
+    &lt;TextView
+        android:id=&#34;@+id/product_info&#34;
+        android:layout_width=&#34;match_parent&#34;
+        android:layout_height=&#34;wrap_content&#34;
+        android:text=&#34;Product Name&#34;
+        android:paddingTop=&#34;2dp&#34;
+        android:paddingBottom=&#34;2dp&#34;/&gt;
+
+    &lt;CheckBox
+        android:id=&#34;@+id/audioCheckBox&#34;
+        android:layout_width=&#34;match_parent&#34;
+        android:layout_height=&#34;wrap_content&#34;
+        android:text=&#34;Disable Audio&#34; /&gt;
+
+&lt;/LinearLayout&gt;
+</code></pre>
+<h2 is-upgraded>Creating the MainFragment</h2>
+<p>Create the MainFragment Class. Create a new Kotlin class called ‘MainFragment&#39;. This class must extend ‘Fragment&#39;.</p>
+<pre><code language="language-java" class="language-java">class MainFragment : Fragment() {
+
+}
+</code></pre>
+<h2 is-upgraded>Declaring the Class Variables</h2>
+<p>Add the following variables to connect to the MainViewModel class, create a list of missing permissions, create the AudioCheckboxListener listener, and connect to the UI elements in the fragment_main.xml.</p>
+<pre><code language="language-java" class="language-java">class MainFragment : Fragment() {
+    private val viewModel: MainViewModel by viewModels()
+    private var missingPermissions = mutableListOf&lt;String&gt;()
+    private lateinit var mListener: AudioCheckboxListener
+
+    private lateinit var statusTextView: TextView
+    private lateinit var productInfoTextView: TextView
+}
+</code></pre>
+<h2 is-upgraded>Creating the Companion Object</h2>
+<p>A companion object will be used to keep track of the necessary permissions for the application to function correctly and the request code for permission requests.</p>
+<pre><code language="language-java" class="language-java">class MainFragment : Fragment() {
+    ...
+
+    companion object {
+        const val TAG = &#34;LivestreamApplication&#34;
+        private const val REQUEST_PERMISSION_CODE = 12345
+        private val REQUIRED_PERMISSION_LIST = mutableListOf(
+            Manifest.permission.VIBRATE,
+            Manifest.permission.INTERNET,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.WAKE_LOCK,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.CHANGE_WIFI_STATE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.FOREGROUND_SERVICE
+        )
+    }
+}
+</code></pre>
+<h2 is-upgraded>Overriding the onCreateView</h2>
+<p>The onCreateView function contains two functions and a checkbox click listener. Set up the setupData and checkAndRequestPermissions functions in a moment. The checkbox click listener will send a callback to the MainActivity when it is clicked by the user.</p>
+<pre><code language="language-java" class="language-java">override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?){
+    val view = inflater.inflate(R.layout.fragment_main, container, false)
+
+    setupData(view)
+    checkAndRequestPermissions()
+
+    // Checks the value of the checkbox when clicked and passes the information back to the activity
+    val checkbox = view.findViewById&lt;CheckBox&gt;(R.id.audioCheckBox)
+    checkbox.setOnClickListener {
+        mListener.isAudioDisabled(checkbox.isChecked)
+    }
+
+    return view
+
+}
+</code></pre>
+<h2 is-upgraded>setupData Function</h2>
+<p>The setupData function observes the LiveData from the MainViewModel so that the UI can be updated instantly. The TextViews we declared earlier are also initalized.</p>
+<pre><code language="language-java" class="language-java">private fun setupData(v: View) {
+    // When the drone is connected or disconnected, the UI will be updated
+    viewModel.notifyStatusChanged.observe(viewLifecycleOwner, Observer {
+        refreshSDKRelativeUI()
+    })
+
+    statusTextView = v.findViewById(R.id.status)
+    productInfoTextView = v.findViewById(R.id.product_info)
+}
+</code></pre>
+<h2 is-upgraded>Updating the UI when the Connection Status Changes</h2>
+<p>The refreshSDKRelativeUI function updates the text views and enable/disable the start stream button depending on the drone&#39;s connection.</p>
+<pre><code language="language-java" class="language-java">private fun refreshSDKRelativeUI(){
+    val mProduct = viewModel.product
+    // If the drone is connected
+    if(mProduct != null &amp;&amp; mProduct.isConnected){
+        statusTextView.text = &#34;Status: Connected&#34;
+        if (mProduct.model != null){
+            productInfoTextView.text = mProduct.model.displayName
+        } else {
+            productInfoTextView.text = &#34;Unknown&#34;
+        }
+    // If the drone is not available
+    } else {
+        productInfoTextView.text = &#34;Unknown&#34;
+        statusTextView.text = &#34;Unkown&#34;
+    }
+}
+</code></pre>
+<h2 is-upgraded>Checking and Requesting Permissions</h2>
+<p>The checkAndRequestPermissions function checks for any missing the permissions that the user has not accepted, and then requests them. If no permissions are missing, the application will start registration with DJI.</p>
+<pre><code language="language-java" class="language-java">private fun checkAndRequestPermissions(){
+    // If permission is missing, then it is added to the list
+    for (permission in REQUIRED_PERMISSION_LIST){
+        if(ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED){
+            missingPermissions.add(permission)
+        }
+    }
+    // If there are no permissions in the missing permission list, then start drone connection
+    if(missingPermissions.isEmpty()){
+        viewModel.registerDJI(requireActivity())
+    } else {
+        // If there are missing permissions, then request the missing permissions
+        Log.d(TAG, &#34;Missing permission.&#34;)
+        ActivityCompat.requestPermissions(requireActivity(), missingPermissions.toTypedArray(),
+            REQUEST_PERMISSION_CODE
+        )
+    }
+}
+</code></pre>
+<h2 is-upgraded>Request Permissions Result</h2>
+<p>To check if the permissions that were requested in checkAndRequestPermissions were accepted, override the onRequestPermissionsResults function. If there are still missing permissions, the application will not register with DJI. If all permissions have been accepted, then the registration will begin.</p>
+<pre><code language="language-java" class="language-java">override fun onRequestPermissionsResult(requestCode: Int, permissions: Array&lt;out String&gt;, grantResults: IntArray) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    if(requestCode == REQUEST_PERMISSION_CODE){
+        // Checks to see if the permissions have been granted, if
+        // they have been granted, remove them from the missing permission list
+        for (i in grantResults.size - 1 downTo 0) {
+            if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                missingPermissions.remove(permissions[i])
+            }
+        }
+    }
+    // If the missing permission list is empty, then start the drone connection
+    if(missingPermissions.isEmpty()){
+        viewModel.registerDJI(requireActivity())
+    } else {
+        Log.d(TAG, &#34;Missing permission.&#34;)
+    }
+}
+</code></pre>
+<h2 is-upgraded>Creating the Audio Checkbox Listener</h2>
+<p>In order for the callback to the MainActivity to function correctly, assign the AudioCheckboxListener interface in MainActivity to the MainFragment. We do this through a public function that can be called in MainActivity.</p>
+<pre><code language="language-java" class="language-java">fun initializeAudioListeners(listener: AudioCheckboxListener){
+    mListener = listener
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Creating the Video Fragment" duration="10">
+        <p>This fragment will be responsible for displaying the camera view from the drone.</p>
+<h2 is-upgraded>Creating the Layout File for the Video Fragment</h2>
+<p>Create a new resouce layout file in the layout folder called ‘fragment_video.xml&#39;. Add a TextureView.</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;androidx.constraintlayout.widget.ConstraintLayout xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;
+    xmlns:app=&#34;http://schemas.android.com/apk/res-auto&#34;&gt;
+
+    &lt;TextureView
+    android:id=&#34;@+id/video_texture_view&#34;
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;/&gt;
+
+&lt;/androidx.constrainLayout.widget.ConstrainLayout&gt;
+</code></pre>
+<h2 is-upgraded>Creating the Video Fragment</h2>
+<p>Create a new Kotlin class called ‘VideoFragment&#39;. This class must extend ‘Fragment&#39;.</p>
+<pre><code language="language-java" class="language-java">class VideoFragment: Fragment() {
+
+}
+</code></pre>
+<p>Three private variables will be created for the TextureView in the &#34;fragment_video.xml&#34; layout file, DJI&#39;s Codec Manager, and a Video Feed Listener to receive the video from the drone.</p>
+<pre><code language="language-java" class="language-java">class VideoFragment: Fragment() {
+    private lateinit var videoTextureView: TextureView
+    private var codecManager: DJICodecManager? = null
+    private var mReceivedVideoDataListener: VideoFeeder.VideoDataListener? = null
+}
+</code></pre>
+<h2 is-upgraded>onCreateView Function</h2>
+<p>The onCreateView function connects the videoTextureView variable to the UI element in the &#34;fragment_video.xml&#34; file.</p>
+<pre><code language="language-java" class="language-java">class VideoFragment: Fragment() {
+    ...
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle?): View? {
+        val view = inflater.inflate(R.layout.fragment_video, container, false)
+        // Texture view for the drone camera view
+        videoTextureView = view.findViewById(R.id.video_texture_view)
+
+        return view
+    }
+}
+</code></pre>
+<h2 is-upgraded>onViewCreated Function</h2>
+<p>The onViewCreated function is responsible for connecting the video feed from the drone to the texture view.</p>
+<pre><code language="language-java" class="language-java">class VideoFragment: Fragment() {
+    ...
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+    }
+}
+</code></pre>
+<p>Add a surface texture listener for the texture view that updates the texture view with the most up-to-date frames from the drone.</p>
+<pre><code language="language-java" class="language-java">override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
+    
+    videoTextureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+
+    }
+}
+</code></pre>
+<p>The TextureView.SurfaceTextureListener overrides the following four functions:</p>
+<ul>
+<li>onSurfaceTextureChanged - Updates the texture view if the size of it changes</li>
+<li>onSurfaceTextureUpdated - Not used for this application</li>
+<li>onSurfaceTextureDestroyed - Called when the fragment is destroyed</li>
+<li>onSurfaceTextureAvailable - When the texture view is ready, the video from the drone will be assigned to the view and displayed.</li>
+</ul>
+<h2 is-upgraded>Setting up the Surface Texture Listener</h2>
+<pre><code language="language-java" class="language-java">override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
+    
+    videoTextureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+        override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
+            if (codecManager == null){
+                codecManager = DJICodecManager(requireActivity(), p0, p1, p2)
+            }
+        }
+
+        override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
+
+        }
+
+        override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
+            // If the texture is destroyed, then clean the texture view
+            codecManager?.cleanSurface()
+            return false
+        }
+
+        override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+            // If the texture view is available adn the DJI codec manager is not yet initialized yet
+            if (codecManager == null){
+                // Assign the codec manager to the texture view
+                codecManager = DJICodecManager(requireActivity(), surface, width, height)
+            }
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Video Feed Listener</h2>
+<p>The video feed listener sends the video feed bytes to the CodecManager to be used with the texture view.</p>
+<pre><code language="language-java" class="language-java">override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
+    
+    videoTextureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+        ...
+    }
+
+    mReceivedVideoDataListener = VideoFeeder.VideoDataListener { bytes, i -&gt;
+        codecManager?.sendDataToDecoder(bytes, i)
+    }
+}
+</code></pre>
+<h2 is-upgraded>Removing the Video Feed Listener</h2>
+<p>When the fragment is paused, the video feed listener needs to be removed. Do this in the onPause Function.</p>
+<pre><code language="language-java" class="language-java">class VideoFragment: Fragment() {
+    ...
+
+    override fun onPause() {
+        // Removes the data listener
+        if(mReceivedVideoDataListener != null){
+            VideoFeeder.getInstance().primaryVideoFeed.removeVideoDataListener(mReceivedVideoDataListener)
+        }
+        super.onPause()
+    }
+}
+</code></pre>
+<h2 is-upgraded>Cleaning the Code Manager</h2>
+<p>When the fragment is destroyed, the DJI Codec Mnager needs to be cleaned and removed. This prevents any errors with memory leaks.</p>
+<pre><code language="language-java" class="language-java">class VideoFragment: Fragment() {
+    ...
+
+    override fun onDestroy() {
+        // Cleans and destroys teh texture view codec
+        codecManager?.cleanSurface()
+        codecManager?.destroyCodec()
+        super.onDestroy()
+    }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Creating the MainActivity" duration="18">
+        <p>MainActivity is responsible for getting the connection status of the drone, waiting until the drone is connected before streaming can begin, and then starting the stream if possible.</p>
+<h2 is-upgraded>Desiging the Main Activity Layout</h2>
+<p>&#34;activity_main.xml&#34; will have a button for starting/stopping the stream and a frame layout where the fragments will be contained.</p>
+<pre><code language="language-javascript" class="language-javascript">&lt;androidx.constraintLayout.widget.ConstraintLayout 
+    xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;
+    xmlns:app=&#34;http://schemas.android.com/apk/res-auto&#34;
+    xmlns:tools=&#34;http://schemas.android.com/tools&#34;
+    android:layout_width=&#34;match_parent&#34;
+    android:layout_height=&#34;match_parent&#34;
+    tools:context=&#34;com.riis.livestream.MainActivity&#34;&gt;
+
+    &lt;Button
+        app:layout_constraintBottom_toBottomOf=&#34;parent&#34;
+        app:layout_constraintEnd_toEndOf=&#34;parent&#34;
+        android:layout_margin=&#34;18dp&#34;
+        android:id=&#34;@+id/startStopButton&#34;
+        android:layout_width=&#34;wrap_content&#34;
+        android:layout_height=&#34;wrap_content&#34;
+        android:enabled=&#34;false&#34;
+        android:text=&#34;Start Stream&#34; /&gt;
+
+    &lt;FrameLayout
+        android:id=&#34;@+id/fragment_container&#34;
+        android:layout_width=&#34;match_parent&#34;
+        android:layout_height=&#34;match_parent&#34;/&gt;
+
+&lt;/androidx.constraintLayout.widget.ConstraintLayout&gt;
+</code></pre>
+<h2 is-upgraded>Adding the Tags and Interfaces to Main Activity</h2>
+<p>MainActivity.kt will be using the MainViewModel class we created earlier. Again add the ‘ExperimentalCoroutinesApi&#39; and ‘Flow&#39; tags above the class declaration. This class will also need to implement two interfaces: the AudioCheckboxListener interface we created earlier, and the ConnectCheckerRTMP to listen for connection changes.</p>
+<pre><code language="language-java" class="language-java">@FlowPreview
+@ExperimentalCoroutinesApi
+class MainActivity : AppCompatActivity(), ConnectCheckerRtmp,
+    AudioCheckboxListener {
+
+}
+</code></pre>
+<h2 is-upgraded>Adding the Class Variables</h2>
+<p>The following variables will be added to the class to connect with the MainViewModel, connect with the button in &#34;activity_main.xml&#34;, disable the audio for the stream, and state the request code to start the stream:</p>
+<ul>
+<li>viewModel</li>
+<li>REQUEST_CODE_STREAM</li>
+<li>button</li>
+<li>disableAudio</li>
+</ul>
+<pre><code language="language-java" class="language-java">@FlowPreview
+@ExperimentalCoroutinesApi
+class MainActivity : AppCompatActivity(), ConnectCheckerRtmp, AudioCheckboxListener {
+    private val viewModel: MainViewModel by viewModels()
+    private val REQUEST_CODE_STREAM = 179 //random num
+    private lateinit var button: Button
+    private var disableAudio = false
+}
+</code></pre>
+<h2 is-upgraded>Overriding the Interface Methods</h2>
+<p>Since we are implementing two interfaces we will need to override the following functions:</p>
+<ul>
+<li>onAuthSuccessRtmp - checks for successful authentication with streaming service</li>
+<li>onNewBitrateRtmp - not used in this application</li>
+<li>onConnectionSuccessRtmp - checks if the stream successfully started with the streaming service</li>
+<li>onConnectionFailedRtmp - checks if the connection to the streaming service failed</li>
+<li>onAuthErrorRtmp - checks if the authentication with streaming service failed</li>
+<li>onDisconnectRtmp - checks if the stream disconnects from the streaming service</li>
+<li>isAudioDisabled - disables/enables the audio from the phone for the stream</li>
+</ul>
+<pre><code language="language-java" class="language-java">@FlowPreview
+@ExperimentalCoroutinesApi
+class MainActivity : AppCompatActivity(), ConnectCheckerRtmp AudioCheckboxListener {
+    
+    ...
+
+    override fun onAuthSuccessRtmp() {
+        Log.i(&#34;streamService&#34;, &#34;Auth Success&#34;)
+    }
+
+    override fun onNewBitrateRtmp(bitrate: Long) {}
+
+    override fun onConnectionSuccessRtmp() {
+        Log.i(&#34;streamService&#34;, &#34;Connection success&#34;)
+    }
+
+    override fun onConnectionFailedRtmp(reason: String) {
+        // if the connection fails, then stop the display service
+        Log.i(&#34;streamService&#34;, &#34;Connection failed -&gt; $reason&#34;)
+        stopService(Intent(this, DisplayService::class.java))
+        button.text = getString(R.string.start_stream)
+    }
+
+    override fun onAuthErrorRtmp() {
+        Log.i(&#34;streamService&#34;, &#34;Auth Error&#34;)
+    }
+
+    override fun onDisconnectRtmp() {
+        Log.i(&#34;streamService&#34;, &#34;Connection Disconnected&#34;)
+    }
+    override fun isAudioDisabled(value: Boolean) {
+        disableAudio = value
+    }
+}
+</code></pre>
+<h2 is-upgraded>Keeping the Screen Awake</h2>
+<p>To keep the screen from turning off while we are streaming, add a flag to keep the screen on while using the application.</p>
+<pre><code language="language-java" class="language-java">overrride fun onCreate(savedInstanceState: Bundle?){
+    super.onCreate(savedInstanceState)
+    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+}
+</code></pre>
+<h2 is-upgraded>Initializing the DisplayService</h2>
+<p>To initialize the DisplayService class call the ‘init&#39; function inside the onCreateMethod.</p>
+<pre><code language="language-java" class="language-java">overrride fun onCreate(savedInstanceState: Bundle?){
+    ...
+
+    DisplayService.init(this)
+}
+</code></pre>
+<h2 is-upgraded>Setting up the Start/Stop Stream Button</h2>
+<p>Initalize the button that we created in &#34;activity_main.xml&#34;. Setup the button click listener. The click listener will attempt start/stop the stream. Depending on whether or not the service is streaming or not, the button text will also be updated. If the user is currently streaming, the service will be stopped.</p>
+<pre><code language="language-java" class="language-java">overrride fun onCreate(savedInstanceState: Bundle?){
+    ...
+
+    button = findViewById(R.id.startStopButton)
+
+    if (DisplayService.isStreaming()) {
+        button.text = getString(R.string.stop_stream)
+    } else {
+        button.text = getString(R.string.start_stream)
+    }
+
+    button.setOnClickListener {
+        if (!DisplayService.isStreaming()) {
+            button.text = getString(R.string.stop_stream)
+            // Tries to start the display service intent (streaming)
+            startActivityForResult(DisplayService.sendIntent(), REQUEST_CODE_STREAM)
+        } else {
+            button.text = getString(R.string.start_stream)
+            // stops the display service intent (streaming)
+            stopService(Intent(this, DisplayService::class.java))
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Observing the Connection Status</h2>
+<p>To enable the button only when the drone is connected, we observe the connection status LiveData in the MainViewModel class.</p>
+<pre><code language="language-java" class="language-java">overrride fun onCreate(savedInstanceState: Bundle?){
+    ...
+
+    viewModel.notifyStatusChanged.observe(this, Observer {
+        refreshLayout(it)
+    })
+}
+</code></pre>
+<h2 is-upgraded>Updating the Layout depending on Connection Status</h2>
+<p>The refreshLayout function handles enabling/disabling the button depending on the connection status of the drone. When the drone becomes disconnected while the user is in the VideoFragment, the VideoFragment will be replaced with the MainFragment.</p>
+<pre><code language="language-java" class="language-java">@FlowPreview
+@ExperimentalCoroutinesApi
+class MainActivity : AppCompatActivity(), ConnectCheckerRtmp, AudioCheckboxListener {
+
+    ...
+
+    private fun refreshLayout(connected: Boolean) {
+        // if the drone is connected
+        if(connected){
+            // Allows the user to start the stream
+            Log.i(&#34;LivestreamApplication&#34;, &#34;product connected MainActivity&#34;)
+            button.isEnabled = true
+        } else {
+            // If the drone becomes disconnected
+            // Check if the current fragment displayed is the video fragment,
+            // if so, then switch back to the main fragment
+            val fragment = supportFragmentManager.findFragmentByTag(&#34;fragment_video&#34;)
+            if( fragment != null &amp;&amp; fragment.isVisible ){
+                val mainFragment = MainFragment()
+                mainFragment.initializeAudioListeners(this)
+                supportFragmentManager.beginTransaction().replace(R.id.fragment_container, mainFragment,&#34;fragment_main&#34;).commit()
+            }
+            // dispable the button and change button text
+            button.text = getString(R.string.start_stream)
+            button.isEnabled = false
+
+            // Stop the display service (stops stream)
+            stopService(Intent(this, DisplayService::class.java))
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>Initializing and Displaying the Main Fragment</h2>
+<p>Once everything has been initialized, we display the MainFragment to the user. To connect the AudioCheckboxListener interface implemented in the MainActivity class and the listener in the MainFragment class, we call the &#34;initializeAudioListeners&#34; method. This allows the MainActivity to check the state of the checkbox in the MainFragment.</p>
+<pre><code language="language-java" class="language-java">overrride fun onCreate(savedInstanceState: Bundle?){
+    ...
+    
+    val fragment = MainFragment()
+    fragment.initializeAudioListeners(this)
+    supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment,&#34;fragment_main&#34;).commit()
+
+}
+</code></pre>
+<h2 is-upgraded>Starting the Stream</h2>
+<p>When the start/stop stream button is clicked, the startActivityForResult function is called. We override the onActivityResult function to listen for the response from the user. If the user allows the service, the stream will be started.</p>
+<p>Remember to replace &#34;your_rtmp_endpoint_here&#34; with your endpint from the streaming service.</p>
+<pre><code language="language-java" class="language-java">@FlowPreview
+@ExperimentalCoroutinesApi
+class MainActivity : AppCompatActivity(), ConnectCheckerRtmp, AudioCheckboxListener {
+
+    ...
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (data != null &amp;&amp; (requestCode == REQUEST_CODE_STREAM
+                    || requestCode == REQUEST_CODE_RECORD &amp;&amp; resultCode == Activity.RESULT_OK)
+        ) {
+            // If the user accepts the foreground service
+            // Start the DisplayService class
+            DisplayService.setData(resultCode, data)
+            val intent = Intent(this, DisplayService::class.java)
+            intent.putExtra(&#34;endpoint&#34;, &#34;your_rtmp_endpoint_here&#34;)
+            intent.putExtra(&#34;audio&#34;, disableAudio)
+
+            // Start service and change the fragment to see the drone camera stream
+            startService(intent)
+            supportFragmentManager.beginTransaction().replace(R.id.fragment_container, VideoFragment(), &#34;fragment_video&#34;).addToBackStack(&#34;fragment_video&#34;).commit()
+        } else {
+            // User didn&#39;t allow the foreground service
+            // Then change button back to normal
+            Log.i(&#34;streamService&#34;, &#34;${MainActivity::class.java.name}: Missing Permissions&#34;)
+            button.text = getString(R.string.start_stream)
+        }
+    }
+}
+</code></pre>
+<h2 is-upgraded>DJI SDK Manager USB Attached Intent</h2>
+<p>The DJI SDK Manager needs to listen for when a USB is attached to the android device.</p>
+<pre><code language="language-java" class="language-java">@FlowPreview
+@ExperimentalCoroutinesApi
+class MainActivity : AppCompatActivity(), ConnectCheckerRtmp, AudioCheckboxListener {
+
+    ...
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+
+        val action = intent?.action
+        if (UsbManager.ACTION_USB_ACCESSORY_ATTACHED == action) {
+            val attachedIntent = Intent()
+            attachedIntent.action = DJISDKManager.USB_ACCESSORY_ATTACHED
+            sendBroadcast(attachedIntent)
+        }
+    }
+}
+</code></pre>
+<p>Congratulations! You have successfully created a streaming application to Twitch. You can now stream your DJI Drone&#39;s Camera to Twitch over RTMP.</p>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+  <script src="//support.google.com/inapp/api.js"></script>
+
+</body>
+</html>
